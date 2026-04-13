@@ -2,16 +2,16 @@
   <div class="app">
     <header class="header">🧠 IQ Test</header>
 
-    <main class="main" :class="{ 'has-sidebar': !started && !finished }">
+    <main class="main" :class="{ 'has-sidebar': !isTestStarted && !isTestFinished }">
       <!-- Боковые панели -->
-      <aside v-if="!started && !finished" class="sidebar left">
+      <aside v-if="!isTestStarted && !isTestFinished" class="sidebar left">
         <h3>📖 Что такое IQ?</h3>
         <p>IQ (Intelligence Quotient) — коэффициент интеллекта, измеряющий уровень умственных способностей.</p>
         <p>Тест оценивает логическое мышление, анализ и способность находить закономерности.</p>
       </aside>
 
       <!-- Стартовый экран -->
-      <div v-if="!started && !finished" class="screen start-screen">
+      <div v-if="!isTestStarted && !isTestFinished" class="screen start-screen">
         <h1>Проверь интеллект</h1>
         <div class="info">
           <span>📝 20 вопросов</span>
@@ -21,28 +21,32 @@
       </div>
 
       <!-- Экран теста -->
-      <div v-if="started && !finished" class="screen test-screen">
+      <div v-if="isTestStarted && !isTestFinished" class="screen test-screen">
         <div class="header-bar">
-          <div class="progress"><div class="fill" :style="{ width: progress + '%' }"></div></div>
-          <span :class="['timer', { warning: timeLeft <= 120 }]">⏱️ {{ ft(timeLeft) }}</span>
+          <div class="progress"><div class="fill" :style="{ width: progressPercent + '%' }"></div></div>
+          <span :class="['timer', { warning: timeRemaining <= 120 }]">⏱️ {{ formatTime(timeRemaining) }}</span>
           <button class="btn-exit" @click="exitTest">✕ Выйти</button>
         </div>
 
         <QuestionView
-          :n="cur + 1" :t="q.length" :q="cq.q"
-          :opts="cq.o" :sel="ans[cur]" :d="cq.d"
-          @select="ans[cur] = $event"
+          :question-number="currentQuestionIndex + 1"
+          :total-questions="questions.length"
+          :question-text="currentQuestion.q"
+          :options="currentQuestion.o"
+          :selected-answer="answers[currentQuestionIndex]"
+          :difficulty="currentQuestion.d"
+          @select="answers[currentQuestionIndex] = $event"
         />
 
         <div class="nav">
-          <button v-if="cur > 0" class="btn-nav" @click="cur--">← Назад</button>
-          <button v-if="cur < q.length - 1" class="btn-nav" @click="cur++" :disabled="ans[cur] == null">Далее →</button>
-          <button v-else class="btn-ok" @click="finish" :disabled="ans.includes(null)">✓ Завершить</button>
+          <button v-if="currentQuestionIndex > 0" class="btn-nav" @click="currentQuestionIndex--">← Назад</button>
+          <button v-if="currentQuestionIndex < questions.length - 1" class="btn-nav" @click="currentQuestionIndex++" :disabled="answers[currentQuestionIndex] == null">Далее →</button>
+          <button v-else class="btn-ok" @click="completeTest" :disabled="answers.includes(null)">✓ Завершить</button>
         </div>
       </div>
 
       <!-- Боковая панель справа -->
-      <aside v-if="!started && !finished" class="sidebar right">
+      <aside v-if="!isTestStarted && !isTestFinished" class="sidebar right">
         <h3>📊 Результат</h3>
         <p><strong>130+</strong> — Очень одарённый 🏆</p>
         <p><strong>120–129</strong> — Одарённый 🌟</p>
@@ -53,15 +57,15 @@
       </aside>
 
       <!-- Результаты -->
-      <div v-if="finished" class="screen result">
-        <div class="circle"><div class="score">{{ iq }}</div><div>IQ</div></div>
-        <h2>{{ lv.e }} {{ lv.l }}</h2>
+      <div v-if="isTestFinished" class="screen result">
+        <div class="circle"><div class="score">{{ iqScore }}</div><div>IQ</div></div>
+        <h2>{{ iqLevel.emoji }} {{ iqLevel.label }}</h2>
         <div class="stats">
-          <div class="stat"><div class="v">{{ cor }}/{{ q.length }}</div><div>Правильных</div></div>
-          <div class="stat"><div class="v">{{ spent }}</div><div>Время</div></div>
-          <div class="stat"><div class="v">{{ acc }}%</div><div>Точность</div></div>
+          <div class="stat"><div class="v">{{ correctAnswersCount }}/{{ questions.length }}</div><div>Правильных</div></div>
+          <div class="stat"><div class="v">{{ formattedElapsedTime }}</div><div>Время</div></div>
+          <div class="stat"><div class="v">{{ accuracyPercent }}%</div><div>Точность</div></div>
         </div>
-        <button class="btn-primary" @click="restart">🔄 Заново</button>
+        <button class="btn-primary" @click="resetTest">🔄 Заново</button>
       </div>
     </main>
 
@@ -71,47 +75,59 @@
 
 <script setup>
 import { ref, computed, onUnmounted } from 'vue'
-import { questions as q, calcIQ, getIQLevel } from './data/quizData.js'
+import { questions, calcIQ as calculateIQ, getIQLevel } from './data/quizData.js'
 import QuestionView from './components/QuestionView.vue'
 
-const TOTAL_TIME = 20 * 60
-const started = ref(false), finished = ref(false), cur = ref(0)
-const ans = ref(Array(q.length).fill(null))
-const timeLeft = ref(TOTAL_TIME), tm = ref(0), ti = null
-let startTime = 0
+const TOTAL_TIME_SECONDS = 20 * 60
+const isTestStarted = ref(false)
+const isTestFinished = ref(false)
+const currentQuestionIndex = ref(0)
+const answers = ref(Array(questions.length).fill(null))
+const timeRemaining = ref(TOTAL_TIME_SECONDS)
+const elapsedTime = ref(0)
+let timerId = null
+let testStartTime = 0
 
-const cq = computed(() => q[cur.value])
-const progress = computed(() => (cur.value + 1) / q.length * 100)
-const cor = computed(() => q.reduce((s, x, i) => s + (ans.value[i] === x.a ? 1 : 0), 0))
-const iq = computed(() => calcIQ(cor.value, tm.value))
-const lv = computed(() => getIQLevel(iq.value))
-const acc = computed(() => Math.round(cor.value / q.length * 100))
-const spent = computed(() => ft(tm.value))
+const currentQuestion = computed(() => questions[currentQuestionIndex.value])
+const progressPercent = computed(() => (currentQuestionIndex.value + 1) / questions.length * 100)
+const correctAnswersCount = computed(() => questions.reduce((sum, question, index) => sum + (answers.value[index] === question.a ? 1 : 0), 0))
+const iqScore = computed(() => calculateIQ(correctAnswersCount.value, elapsedTime.value))
+const iqLevel = computed(() => getIQLevel(iqScore.value))
+const accuracyPercent = computed(() => Math.round(correctAnswersCount.value / questions.length * 100))
+const formattedElapsedTime = computed(() => formatTime(elapsedTime.value))
 
-function tick() {
-  const elapsed = Math.floor((Date.now() - startTime) / 1000)
-  tm.value = elapsed
-  timeLeft.value = Math.max(0, TOTAL_TIME - elapsed)
-  if (timeLeft.value <= 0) { finish(); return }
-  ti = setTimeout(tick, 1000)
+function updateTimer() {
+  const elapsed = Math.floor((Date.now() - testStartTime) / 1000)
+  elapsedTime.value = elapsed
+  timeRemaining.value = Math.max(0, TOTAL_TIME_SECONDS - elapsed)
+  if (timeRemaining.value <= 0) { completeTest(); return }
+  timerId = setTimeout(updateTimer, 1000)
 }
 
 function startTest() {
-  started.value = true
-  startTime = Date.now()
-  tick()
+  isTestStarted.value = true
+  testStartTime = Date.now()
+  updateTimer()
 }
-const finish = () => { finished.value = true; clearTimeout(ti) }
-const exitTest = () => { if (confirm('Выйти? Прогресс будет потерян')) restart() }
-const restart = () => {
-  started.value = false; finished.value = false; cur.value = 0
-  ans.value = Array(q.length).fill(null); timeLeft.value = TOTAL_TIME; tm.value = 0
+
+const completeTest = () => { isTestFinished.value = true; clearTimeout(timerId) }
+const exitTest = () => { if (confirm('Выйти? Прогресс будет потерян')) resetTest() }
+const resetTest = () => {
+  isTestStarted.value = false
+  isTestFinished.value = false
+  currentQuestionIndex.value = 0
+  answers.value = Array(questions.length).fill(null)
+  timeRemaining.value = TOTAL_TIME_SECONDS
+  elapsedTime.value = 0
 }
-const ft = s => {
-  const m = Math.max(0, ~~(s / 60)), sec = Math.max(0, s % 60)
-  return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
+
+const formatTime = totalSeconds => {
+  const minutes = Math.max(0, ~~(totalSeconds / 60))
+  const seconds = Math.max(0, totalSeconds % 60)
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
-onUnmounted(() => clearTimeout(ti))
+
+onUnmounted(() => clearTimeout(timerId))
 </script>
 
 <style scoped>

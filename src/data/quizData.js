@@ -1,4 +1,4 @@
-// Вопросы IQ теста: q=текст, o=варианты, a=ответ, d=сложность
+// Вопросы IQ теста: question=текст вопроса, options=варианты ответа, correctAnswer=правильный ответ, difficulty=сложность
 export const questions = [
   { q: "Какое число продолжает ряд: 2, 6, 12, 20, ...?", o: ["28", "30", "32", "26"], a: 1, d: 2 },
   { q: "Книга относится к чтению, как вилка к:", o: ["Еде", "Кухне", "Металлу", "Ножу"], a: 0, d: 1 },
@@ -22,16 +22,16 @@ export const questions = [
   { q: "Завершите ряд: 1, 4, 9, 16, 25, 36, ?", o: ["42", "49", "64", "45"], a: 1, d: 2 }
 ]
 
-// Расчёт IQ
-export const calcIQ = (c, t) =>
-  Math.round(Math.min(145, 70 + (c / questions.length) * 75 + Math.max(0, (600 - t) / 600 * 10)))
+// Расчёт IQ на основе правильных ответов и затраченного времени
+export const calcIQ = (correctAnswersCount, elapsedTimeSeconds) =>
+  Math.round(Math.min(145, 70 + (correctAnswersCount / questions.length) * 75 + Math.max(0, (600 - elapsedTimeSeconds) / 600 * 10)))
 
-// Уровень IQ
-export const getIQLevel = iq => {
-  if (iq >= 130) return { label: "Очень одарённый", emoji: "🏆" }
-  if (iq >= 120) return { label: "Одарённый", emoji: "🌟" }
-  if (iq >= 110) return { label: "Выше среднего", emoji: "📈" }
-  if (iq >= 100) return { label: "Средний", emoji: "📊" }
-  if (iq >= 90) return { label: "Ниже среднего", emoji: "📉" }
+// Определение уровня IQ
+export const getIQLevel = (iqScore) => {
+  if (iqScore >= 130) return { label: "Очень одарённый", emoji: "🏆" }
+  if (iqScore >= 120) return { label: "Одарённый", emoji: "🌟" }
+  if (iqScore >= 110) return { label: "Выше среднего", emoji: "📈" }
+  if (iqScore >= 100) return { label: "Средний", emoji: "📊" }
+  if (iqScore >= 90) return { label: "Ниже среднего", emoji: "📉" }
   return { label: "Начальный", emoji: "🌱" }
 }

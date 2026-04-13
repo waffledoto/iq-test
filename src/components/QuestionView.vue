@@ -1,18 +1,25 @@
 <template>
   <div class="card">
     <div class="head">
-      <span class="num">Вопрос {{ n }}/{{ t }}</span>
-      <span class="stars">{{ '★'.repeat(d).padEnd(3, '☆') }}</span>
+      <span class="num">Вопрос {{ questionNumber }}/{{ totalQuestions }}</span>
+      <span class="stars">{{ '★'.repeat(difficulty).padEnd(3, '☆') }}</span>
     </div>
-    <h2 class="text">{{ q }}</h2>
-    <button v-for="(o, i) in opts" :key="i" :class="['opt', { sel: sel === i }]" @click="$emit('select', i)">
-      <span class="let">{{ String.fromCharCode(65 + i) }}</span> {{ o }}
+    <h2 class="text">{{ questionText }}</h2>
+    <button v-for="(option, index) in options" :key="index" :class="['opt', { sel: selectedAnswer === index }]" @click="$emit('select', index)">
+      <span class="let">{{ String.fromCharCode(65 + index) }}</span> {{ option }}
     </button>
   </div>
 </template>
 
 <script setup>
-const { n, t, q, opts, sel, d } = defineProps(['n', 't', 'q', 'opts', 'sel', 'd'])
+const {
+  questionNumber,
+  totalQuestions,
+  questionText,
+  options,
+  selectedAnswer,
+  difficulty
+} = defineProps(['questionNumber', 'totalQuestions', 'questionText', 'options', 'selectedAnswer', 'difficulty'])
 defineEmits(['select'])
 </script>
 
