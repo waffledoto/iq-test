@@ -31,10 +31,10 @@
         <QuestionView
           :question-number="currentQuestionIndex + 1"
           :total-questions="questions.length"
-          :question-text="currentQuestion.q"
-          :options="currentQuestion.o"
+          :question-text="currentQuestion.question"
+          :options="currentQuestion.options"
           :selected-answer="answers[currentQuestionIndex]"
-          :difficulty="currentQuestion.d"
+          :difficulty="currentQuestion.difficulty"
           @select="answers[currentQuestionIndex] = $event"
         />
 
@@ -90,7 +90,7 @@ let testStartTime = 0
 
 const currentQuestion = computed(() => questions[currentQuestionIndex.value])
 const progressPercent = computed(() => (currentQuestionIndex.value + 1) / questions.length * 100)
-const correctAnswersCount = computed(() => questions.reduce((sum, question, index) => sum + (answers.value[index] === question.a ? 1 : 0), 0))
+const correctAnswersCount = computed(() => questions.reduce((sum, question, index) => sum + (answers.value[index] === question.correctAnswer ? 1 : 0), 0))
 const iqScore = computed(() => calculateIQ(correctAnswersCount.value, elapsedTime.value))
 const iqLevel = computed(() => getIQLevel(iqScore.value))
 const accuracyPercent = computed(() => Math.round(correctAnswersCount.value / questions.length * 100))
